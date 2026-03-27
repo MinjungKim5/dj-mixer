@@ -94,13 +94,58 @@ const animRef = useRef<ReturnType<typeof setInterval> | null>(null);
 - ref는 리렌더 없이 값을 유지하므로 interval 관리에 적합
 - 새 명령어 실행 시 기존 interval을 정리(`stopAnimation`)하고 새로 시작
 
+### 한글 키 매핑
+
+한/영 전환을 깜빡하고 한글 상태에서 입력해도 동작하도록 `normalize()` 함수에서 한글 자모를 매핑합니다:
+
+```typescript
+.replace(/[ㅣL]/g, "l")  // ㅣ → l
+.replace(/[ㄱR]/g, "r")  // ㄱ → r
+.replace(/[ㅡM]/g, "m")  // ㅡ → m
+```
+
+이는 한국어 키보드에서 `l`, `r`, `m` 키를 한글 모드로 누르면 각각 `ㅣ`, `ㄱ`, `ㅡ`가 입력되기 때문입니다. 콜론(`:`)도 허용하되 내부적으로 제거하여 `l:30`과 `l30` 모두 동작합니다.
+
 ### Escape로 긴급 정지
 
 애니메이션 도중 Escape 키를 누르면 `stopAnimation()`이 호출되어 interval이 정리되고, 크로스페이더가 현재 위치에서 멈춥니다.
 
 ---
 
-## 3. 레이아웃 구성
+## 3. 타임라인 시크바 & 전체화면
+
+### 재생 시간 폴링
+
+DjDeck은 재생 중일 때 250ms 간격으로 `getCurrentTime()`과 `getDuration()`을 폴링하여 `currentTime`/`duration` state를 갱신합니다. 이 값은 타임라인 바 표시와 오토모드 타이밍 감지 양쪽에 사용됩니다.
+
+```typescript
+useEffect(() => {
+  if (isPlaying) {
+    timeIntervalRef.current = setInterval(() => {
+      const ct = playerRef.current.getCurrentTime();
+      const dur = playerRef.current.getDuration();
+      setCurrentTime(ct);
+      setDuration(dur);
+      onTimeUpdateRef.current?.(ct, dur);  // page.tsx로 시간 전달
+    }, 250);
+  }
+  return () => clearInterval(timeIntervalRef.current);
+}, [isPlaying]);
+```
+
+`onTimeUpdate` 콜백을 `useRef`로 감싸는 이유: 콜백이 바뀔 때마다 interval을 재시작하지 않기 위해서입니다. ref는 항상 최신 함수를 참조하므로 effect 의존성에 넣지 않아도 됩니다.
+
+### 시크(Seek)
+
+`<input type="range">`의 `max`를 `duration`, `value`를 `currentTime`으로 연결하여 드래그로 재생 위치를 변경합니다. `playerRef.current.seekTo(time)`으로 YouTube 플레이어에 반영합니다.
+
+### 전체화면
+
+`playerContainerRef`를 플레이어 wrapper div에 연결하고, `requestFullscreen()` / `exitFullscreen()`으로 토글합니다. YouTube iframe이 아닌 부모 div를 전체화면으로 만들어야 브라우저 호환성이 좋습니다.
+
+---
+
+## 4. 레이아웃 구성
 
 ```
 ┌─ SPEED A ─┐  ┌── Crossfader ──┐  ┌─ SPEED B ─┐
@@ -118,7 +163,7 @@ const animRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
 ---
 
-## 4. 자동 재생 모드 (Auto Mode)
+## 5. 자동 재생 모드 (Auto Mode)
 
 ### 구조: Context로 layout ↔ page 통신
 
@@ -141,6 +186,7 @@ layout.tsx는 서버 컴포넌트이지만, 클라이언트 컴포넌트(`AutoMo
 export interface DjDeckHandle {
   play(): void;
   pause(): void;
+  loadAndPlay(videoId: string): void;  // 특정 곡 로드 후 즉시 재생
   cueNext(): void;  // 다음 곡 로드 후 즉시 정지 (스탠바이)
 }
 
@@ -148,6 +194,13 @@ const DjDeck = forwardRef<DjDeckHandle, DjDeckProps>(...);
 ```
 
 page.tsx에서 `deckARef.current.play()` 형태로 호출합니다.
+
+### 곡 끝(handleEnded) 처리 분기
+
+오토모드 여부에 따라 곡이 끝났을 때 동작이 다릅니다:
+
+- **오토모드 OFF**: 다음 곡 자동 로드 + 즉시 재생 (기존 동작)
+- **오토모드 ON**: 인덱스만 진행하고 정지. 실제 재생은 오토모드 타이밍 로직(preroll phase)에서 제어합니다. 이렇게 분리해야 크로스페이드 타이밍이 깨지지 않습니다.
 
 ### 시간 정보 상위 전달: onTimeUpdate 콜백
 
@@ -177,7 +230,7 @@ Tailwind의 arbitrary value 문법으로 인라인 box-shadow를 지정합니다
 
 ---
 
-## 5. 파일 변경 요약
+## 6. 파일 변경 요약
 
 ```
 src/app/
@@ -186,7 +239,7 @@ src/app/
 │   └── automode.ts           ← 새 파일: AutoModeContext + AUTO_CONFIG 상수
 ├── components/
 │   ├── YouTubePlayer.tsx     ← 핸들에 setPlaybackRate, getPlaybackRate 메서드 추가
-│   ├── DjDeck.tsx            ← forwardRef로 변환, DjDeckHandle 노출, onTimeUpdate 콜백 추가
+│   ├── DjDeck.tsx            ← forwardRef로 변환, DjDeckHandle 노출, 타임라인 시크바, 전체화면, onTimeUpdate 콜백 추가
 │   ├── CrossfaderCommand.tsx ← 새 파일: 명령어 파싱 + 애니메이션
 │   ├── AutoModeProvider.tsx  ← 새 파일: Context Provider
 │   └── AutoModeToggle.tsx    ← 새 파일: 📼 토글 버튼
