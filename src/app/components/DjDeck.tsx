@@ -1,11 +1,33 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect } from "react";
+import {
+  useRef,
+  useState,
+  useCallback,
+  useEffect,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 import YouTubePlayer from "./YouTubePlayer";
 import TrackInput from "./TrackInput";
 import type { YouTubePlayerHandle } from "./YouTubePlayer";
 import type { DeckId, Track } from "../lib/types";
 import { sendProjection } from "../lib/projection";
+
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+export interface DjDeckHandle {
+  play(): void;
+  pause(): void;
+  /** 특정 곡을 로드하고 재생 */
+  loadAndPlay(videoId: string): void;
+  /** 다음 곡을 로드 후 즉시 정지 (스탠바이) */
+  cueNext(): void;
+}
 
 interface DjDeckProps {
   deckId: DeckId;
@@ -13,33 +35,113 @@ interface DjDeckProps {
   currentIndex: number;
   volume: number; // 0~100 (크로스페이더 반영된 최종 볼륨)
   localVolume: number; // 개별 볼륨 (UI 표시용)
+  playbackRate: number; // 배속 (0.25 ~ 2)
   isProjecting: boolean; // 이 덱이 현재 프로젝션 출력 대상인지
+  autoMode?: boolean; // 오토모드 활성 여부
   onVolumeChange: (volume: number) => void;
   onAddTrack: (tracks: Track[]) => void;
   onCurrentIndexChange: (index: number) => void;
   onTitleUpdate: (index: number, title: string) => void;
+  onTimeUpdate?: (currentTime: number, duration: number) => void;
 }
 
-export default function DjDeck({
+const DjDeck = forwardRef<DjDeckHandle, DjDeckProps>(function DjDeck({
   deckId,
   queue,
   currentIndex,
   volume,
   localVolume,
+  playbackRate,
   isProjecting,
+  autoMode,
   onVolumeChange,
   onAddTrack,
   onCurrentIndexChange,
   onTitleUpdate,
-}: DjDeckProps) {
+  onTimeUpdate,
+}, ref) {
   const playerRef = useRef<YouTubePlayerHandle>(null);
+  const playerContainerRef = useRef<HTMLDivElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playerReady, setPlayerReady] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const timeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const onTimeUpdateRef = useRef(onTimeUpdate);
+  onTimeUpdateRef.current = onTimeUpdate;
+
+  // 외부에서 덱을 제어할 수 있는 핸들
+  useImperativeHandle(ref, () => ({
+    play() {
+      if (!playerRef.current || queue.length === 0) return;
+      if (currentIndex >= 0 && queue[currentIndex]) {
+        playerRef.current.loadVideo(queue[currentIndex].videoId);
+      }
+      playerRef.current.play();
+      setIsPlaying(true);
+    },
+    loadAndPlay(videoId: string) {
+      if (!playerRef.current) return;
+      playerRef.current.loadVideo(videoId);
+      playerRef.current.play();
+      setIsPlaying(true);
+    },
+    pause() {
+      playerRef.current?.pause();
+      setIsPlaying(false);
+    },
+    cueNext() {
+      const nextIndex = currentIndex + 1;
+      if (nextIndex < queue.length) {
+        onCurrentIndexChange(nextIndex);
+        playerRef.current?.cueVideo(queue[nextIndex].videoId);
+        setIsPlaying(false);
+      }
+    },
+  }));
+
+  // 재생 시간 폴링 (250ms 간격)
+  useEffect(() => {
+    if (isPlaying) {
+      timeIntervalRef.current = setInterval(() => {
+        if (playerRef.current) {
+          const ct = playerRef.current.getCurrentTime();
+          const dur = playerRef.current.getDuration();
+          setCurrentTime(ct);
+          setDuration(dur);
+          onTimeUpdateRef.current?.(ct, dur);
+        }
+      }, 250);
+    } else {
+      if (timeIntervalRef.current) {
+        clearInterval(timeIntervalRef.current);
+        timeIntervalRef.current = null;
+      }
+    }
+    return () => {
+      if (timeIntervalRef.current) {
+        clearInterval(timeIntervalRef.current);
+        timeIntervalRef.current = null;
+      }
+    };
+  }, [isPlaying]);
+
+  // 타임라인 시크
+  function handleSeek(e: React.ChangeEvent<HTMLInputElement>) {
+    const time = Number(e.target.value);
+    playerRef.current?.seekTo(time);
+    setCurrentTime(time);
+  }
 
   // 볼륨 변경 시 플레이어에 적용
   useEffect(() => {
     playerRef.current?.setVolume(volume);
   }, [volume]);
+
+  // 배속 변경 시 플레이어에 적용
+  useEffect(() => {
+    playerRef.current?.setPlaybackRate(playbackRate);
+  }, [playbackRate]);
 
   // 재생 / 일시정지
   function togglePlay() {
@@ -64,6 +166,14 @@ export default function DjDeck({
   // 곡 끝나면 다음 곡으로 자동 전환
   const handleEnded = useCallback(() => {
     const nextIndex = currentIndex + 1;
+    if (autoMode) {
+      // 오토모드: 인덱스만 진행하고 정지 (다음 preroll 시그널에서 play)
+      if (nextIndex < queue.length) {
+        onCurrentIndexChange(nextIndex);
+      }
+      setIsPlaying(false);
+      return;
+    }
     if (nextIndex < queue.length) {
       onCurrentIndexChange(nextIndex);
       playerRef.current?.loadVideo(queue[nextIndex].videoId);
@@ -74,7 +184,7 @@ export default function DjDeck({
       setIsPlaying(false);
       if (isProjecting) sendProjection({ type: "stop" });
     }
-  }, [currentIndex, queue, onCurrentIndexChange, isProjecting]);
+  }, [currentIndex, queue, onCurrentIndexChange, isProjecting, autoMode]);
 
   // 플레이어 상태 변경 시 제목 갱신
   const handleStateChange = useCallback(
@@ -92,24 +202,15 @@ export default function DjDeck({
     [currentIndex, onTitleUpdate]
   );
 
-  // 큐 조작 함수들을 외부에서 사용할 수 있도록 export하지 않고,
-  // page.tsx에서 Queue에 전달할 핸들러는 page.tsx에서 구성
-  // → 여기서는 큐에서 곡 선택 시 플레이어 로드만 담당
-  // 이를 위해 onCurrentIndexChange가 호출되면 자동 로드하는 effect 사용
-  const prevIndexRef = useRef(currentIndex);
-  useEffect(() => {
-    if (
-      currentIndex !== prevIndexRef.current &&
-      currentIndex >= 0 &&
-      queue[currentIndex]
-    ) {
-      playerRef.current?.loadVideo(queue[currentIndex].videoId);
-      setIsPlaying(true);
-      if (isProjecting)
-        sendProjection({ type: "load", videoId: queue[currentIndex].videoId });
+  function toggleFullscreen() {
+    const el = playerContainerRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      el.requestFullscreen();
     }
-    prevIndexRef.current = currentIndex;
-  }, [currentIndex, queue, isProjecting]);
+  }
 
   const currentTrack = currentIndex >= 0 ? queue[currentIndex] : null;
   const isA = deckId === "A";
@@ -132,7 +233,7 @@ export default function DjDeck({
       {/* 플레이어 + 세로 볼륨 */}
       <div className={`flex gap-2 ${isA ? "flex-row" : "flex-row-reverse"}`}>
         {/* YouTube 플레이어 */}
-        <div className="flex-1 min-w-0">
+        <div ref={playerContainerRef} className="flex-1 min-w-0">
           <YouTubePlayer
             ref={playerRef}
             onReady={() => setPlayerReady(true)}
@@ -188,7 +289,7 @@ export default function DjDeck({
         <button
           onClick={togglePlay}
           disabled={queue.length === 0}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-foreground/10 text-lg transition-colors hover:bg-foreground/20 disabled:opacity-30"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-lg transition-colors hover:bg-foreground/20 disabled:opacity-30"
           aria-label={isPlaying ? "일시정지" : "재생"}
         >
           {isPlaying ? "⏸" : "▶"}
@@ -197,8 +298,37 @@ export default function DjDeck({
           <p className="truncate text-sm font-medium">
             {currentTrack?.title || "재생 중인 곡 없음"}
           </p>
+          {/* 타임라인 바 + 전체화면 */}
+          <div className="mt-1 flex items-center gap-1.5">
+            <span className="text-[10px] font-mono text-foreground/50 tabular-nums">
+              {formatTime(currentTime)}
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={duration || 1}
+              value={currentTime}
+              onChange={handleSeek}
+              className="dj-timeline flex-1 min-w-0"
+            />
+            <span className="text-[10px] font-mono text-foreground/50 tabular-nums">
+              {formatTime(duration)}
+            </span>
+            <button
+              onClick={toggleFullscreen}
+              className="shrink-0 rounded p-0.5 text-foreground/40 hover:text-foreground/70 transition-colors"
+              aria-label="전체화면"
+              title="전체화면"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
-}
+});
+
+export default DjDeck;

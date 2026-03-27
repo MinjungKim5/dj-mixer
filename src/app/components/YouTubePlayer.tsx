@@ -14,8 +14,14 @@ export interface YouTubePlayerHandle {
   play(): void;
   pause(): void;
   loadVideo(videoId: string): void;
+  cueVideo(videoId: string): void;
   setVolume(volume: number): void;
   getVideoData(): { video_id: string; title: string } | null;
+  getCurrentTime(): number;
+  getDuration(): number;
+  seekTo(seconds: number): void;
+  setPlaybackRate(rate: number): void;
+  getPlaybackRate(): number;
 }
 
 interface YouTubePlayerProps {
@@ -44,11 +50,29 @@ const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>(
       loadVideo(videoId: string) {
         playerRef.current?.loadVideoById(videoId);
       },
+      cueVideo(videoId: string) {
+        playerRef.current?.cueVideoById(videoId);
+      },
       setVolume(volume: number) {
         playerRef.current?.setVolume(volume);
       },
       getVideoData() {
         return playerRef.current?.getVideoData() ?? null;
+      },
+      getCurrentTime() {
+        return playerRef.current?.getCurrentTime() ?? 0;
+      },
+      getDuration() {
+        return playerRef.current?.getDuration() ?? 0;
+      },
+      seekTo(seconds: number) {
+        playerRef.current?.seekTo(seconds, true);
+      },
+      setPlaybackRate(rate: number) {
+        playerRef.current?.setPlaybackRate(rate);
+      },
+      getPlaybackRate() {
+        return playerRef.current?.getPlaybackRate() ?? 1;
       },
     }));
 

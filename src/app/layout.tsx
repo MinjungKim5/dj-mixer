@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import ThemeToggle from "./components/ThemeToggle";
+import AutoModeProvider from "./components/AutoModeProvider";
+import AutoModeToggle from "./components/AutoModeToggle";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -32,11 +34,16 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-          <header className="flex items-center justify-between px-6 py-4">
-            <h1 className="text-xl font-bold">🎧 DJ Mixer</h1>
-            <ThemeToggle />
-          </header>
-          <main className="flex flex-1 flex-col">{children}</main>
+          <AutoModeProvider>
+            <header className="flex items-center justify-between px-6 py-4">
+              <h1 className="text-xl font-bold">🎧 DJ Mixer</h1>
+              <div className="flex items-center gap-2">
+                <AutoModeToggle />
+                <ThemeToggle />
+              </div>
+            </header>
+            <main className="flex flex-1 flex-col">{children}</main>
+          </AutoModeProvider>
         </ThemeProvider>
       </body>
     </html>

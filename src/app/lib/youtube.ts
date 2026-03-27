@@ -30,6 +30,10 @@ export interface YTPlayer {
   getPlayerState(): number;
   getCurrentTime(): number;
   getDuration(): number;
+  seekTo(seconds: number, allowSeekAhead: boolean): void;
+  setPlaybackRate(rate: number): void;
+  getPlaybackRate(): number;
+  getAvailablePlaybackRates(): number[];
   getVideoData(): { video_id: string; title: string };
   destroy(): void;
 }
