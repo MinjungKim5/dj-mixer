@@ -5,11 +5,15 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --slider-thumb: #222222;
+  --slider-thumb-border: #ffffff;
 }
 
 .dark {
   --background: #0a0a0a;
   --foreground: #ededed;
+  --slider-thumb: #f0f0f0;
+  --slider-thumb-border: #0a0a0a;
 }
 
 @theme inline {
@@ -23,4 +27,91 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ── 커스텀 슬라이더 (공통 리셋) ── */
+
+input[type="range"].dj-slider,
+input[type="range"].dj-slider-v {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* ── 트랙 ── */
+
+/* 가로 트랙 */
+input[type="range"].dj-slider::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 2px;
+  background: var(--foreground);
+  opacity: 0.15;
+}
+input[type="range"].dj-slider::-moz-range-track {
+  height: 8px;
+  border-radius: 2px;
+  background: var(--foreground);
+  opacity: 0.15;
+}
+
+/* 세로 트랙 */
+input[type="range"].dj-slider-v::-webkit-slider-runnable-track {
+  width: 8px;
+  border-radius: 2px;
+  background: var(--foreground);
+  opacity: 0.15;
+}
+input[type="range"].dj-slider-v::-moz-range-track {
+  width: 8px;
+  border-radius: 2px;
+  background: var(--foreground);
+  opacity: 0.15;
+}
+
+/* ── 썸 (사각형, 큼직하게, 강한 대비) ── */
+
+input[type="range"].dj-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 28px;
+  border-radius: 3px;
+  background: var(--slider-thumb) !important;
+  box-shadow: 0 0 0 2px var(--slider-thumb-border), 0 1px 4px rgba(0,0,0,0.3);
+  margin-top: -10px;
+}
+input[type="range"].dj-slider::-moz-range-thumb {
+  width: 20px;
+  height: 28px;
+  border-radius: 3px;
+  border: 2px solid var(--slider-thumb-border);
+  background: var(--slider-thumb) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
+input[type="range"].dj-slider-v::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 28px;
+  height: 20px;
+  border-radius: 3px;
+  background: var(--slider-thumb) !important;
+  box-shadow: 0 0 0 2px var(--slider-thumb-border), 0 1px 4px rgba(0,0,0,0.3);
+  margin-left: -10px;
+}
+input[type="range"].dj-slider-v::-moz-range-thumb {
+  width: 28px;
+  height: 20px;
+  border-radius: 3px;
+  border: 2px solid var(--slider-thumb-border);
+  background: var(--slider-thumb) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
+input[type="range"].dj-slider:hover::-webkit-slider-thumb,
+input[type="range"].dj-slider-v:hover::-webkit-slider-thumb {
+  opacity: 0.85;
+}
+input[type="range"].dj-slider:hover::-moz-range-thumb,
+input[type="range"].dj-slider-v:hover::-moz-range-thumb {
+  opacity: 0.85;
 }
