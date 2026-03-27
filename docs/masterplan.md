@@ -7,13 +7,13 @@ YouTube IFrame API를 활용한 더블덱 DJ 믹싱 웹 앱.
 
 ## 기술 스택
 
-| 구분 | 선택 | 비고 |
-|------|------|------|
-| 프레임워크 | Next.js (App Router) | Vercel 배포 최적화 |
-| 스타일링 | Tailwind CSS | 다크/라이트 테마 DJ UI |
-| YouTube | YouTube IFrame API | API 키 불필요, 재생/제어 전용 |
-| 배포 | Vercel | zero-config |
-| DB/Auth | 없음 | 클라이언트 전용 앱 |
+| 구분       | 선택                 | 비고                          |
+| ---------- | -------------------- | ----------------------------- |
+| 프레임워크 | Next.js (App Router) | Vercel 배포 최적화            |
+| 스타일링   | Tailwind CSS         | 다크/라이트 테마 DJ UI        |
+| YouTube    | YouTube IFrame API   | API 키 불필요, 재생/제어 전용 |
+| 배포       | Vercel               | zero-config                   |
+| DB/Auth    | 없음                 | 클라이언트 전용 앱            |
 
 ## 핵심 기능
 
@@ -24,6 +24,7 @@ YouTube IFrame API를 활용한 더블덱 DJ 믹싱 웹 앱.
 - 영상+재생목록 URL → 재생목록 우선 처리
 
 **URL 파싱 로직:**
+
 ```
 youtube.com/watch?v={videoId}              → 단일 영상
 youtube.com/playlist?list={playlistId}     → 재생목록
@@ -139,31 +140,33 @@ URL 입력
 ```typescript
 // 각 덱의 상태
 interface DeckState {
-  queue: Track[]          // 큐에 담긴 트랙 목록
-  currentIndex: number    // 현재 재생 중인 트랙 인덱스
-  volume: number          // 개별 볼륨 (0~100)
-  isPlaying: boolean      // 재생 상태
+  queue: Track[]; // 큐에 담긴 트랙 목록
+  currentIndex: number; // 현재 재생 중인 트랙 인덱스
+  volume: number; // 개별 볼륨 (0~100)
+  isPlaying: boolean; // 재생 상태
 }
 
 interface Track {
-  videoId: string
-  title: string           // 초기엔 'Video', 재생 시 실제 제목으로 갱신
+  videoId: string;
+  title: string; // 초기엔 'Video', 재생 시 실제 제목으로 갱신
 }
 
 // 글로벌 상태
 interface MixerState {
-  crossfader: number      // -1(A) ~ 0(center) ~ 1(B)
+  crossfader: number; // -1(A) ~ 0(center) ~ 1(B)
 }
 ```
 
 ## 구현 단계
 
 ### Phase 1: 프로젝트 세팅
+
 - [x] masterplan.md 작성
 - [x] Next.js + Tailwind 보일러플레이트 생성
-- [ ] 다크/라이트 테마 레이아웃 (next-themes + ThemeToggle)
+- [x] 다크/라이트 테마 레이아웃 (next-themes + ThemeToggle)
 
 ### Phase 2: 코어 기능
+
 - [ ] YouTube IFrame API 래퍼 컴포넌트
 - [ ] URL 파싱 유틸 (videoId / playlistId 추출)
 - [ ] 덱 컴포넌트 (플레이어 + 재생 컨트롤)
@@ -172,12 +175,14 @@ interface MixerState {
 - [ ] 크로스페이더
 
 ### Phase 3: UI/UX
+
 - [ ] DJ 스타일 다크/라이트 테마 디자인
 - [ ] 슬라이더 커스텀 스타일링
 - [ ] 반응형 대응 (모바일: 세로 배치)
 - [ ] 현재 재생 곡 하이라이트
 
 ### Phase 4: 추후 확장 (미포함)
+
 - [ ] YouTube Data API 연동 (제목/썸네일 메타데이터)
 - [ ] BPM 감지 / 싱크
 - [ ] 이퀄라이저 (Web Audio API)
