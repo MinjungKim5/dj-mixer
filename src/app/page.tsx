@@ -6,6 +6,7 @@ import type { DjDeckHandle } from "./components/DjDeck";
 import Queue from "./components/Queue";
 import Crossfader from "./components/Crossfader";
 import CrossfaderCommand from "./components/CrossfaderCommand";
+import SmartQueueModal from "./components/SmartQueueModal";
 import type { DeckId, Track } from "./lib/types";
 import { sendProjection } from "./lib/projection";
 import { useAutoMode, AUTO_CONFIG } from "./lib/automode";
@@ -25,7 +26,7 @@ const initialDeck: DeckState = {
 function calcEffectiveVolume(
   deckVolume: number,
   crossfader: number,
-  side: "A" | "B"
+  side: "A" | "B",
 ): number {
   let ratio = 1;
   if (side === "A" && crossfader > 0) {
@@ -43,6 +44,7 @@ export default function Home() {
   const [rateA, setRateA] = useState(1);
   const [rateB, setRateB] = useState(1);
   const [projectDeck, setProjectDeck] = useState<DeckId | null>(null);
+  const [showSmartQueue, setShowSmartQueue] = useState(false);
   const projWindowRef = useRef<Window | null>(null);
 
   // 오토모드
@@ -54,6 +56,52 @@ export default function Home() {
   const fadeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const crossfaderRef = useRef(crossfader);
   crossfaderRef.current = crossfader;
+
+  // 키보드 단축키
+  const rateARef = useRef(rateA);
+  rateARef.current = rateA;
+  const rateBRef = useRef(rateB);
+  rateBRef.current = rateB;
+  const showSmartQueueRef = useRef(showSmartQueue);
+  showSmartQueueRef.current = showSmartQueue;
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      // input/textarea 포커스 중에는 무시
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+      const clamp = (v: number) =>
+        Math.round(Math.max(0.25, Math.min(2, v)) * 100) / 100;
+
+      switch (e.code) {
+        case "KeyQ":
+          setShowSmartQueue((prev) => !prev);
+          break;
+        case "KeyA":
+          deckARef.current?.togglePlay();
+          break;
+        case "KeyB":
+          deckBRef.current?.togglePlay();
+          break;
+        case "KeyU":
+          setRateA(clamp(rateARef.current - 0.05));
+          break;
+        case "KeyI":
+          setRateA(clamp(rateARef.current + 0.05));
+          break;
+        case "KeyO":
+          setRateB(clamp(rateBRef.current - 0.05));
+          break;
+        case "KeyP":
+          setRateB(clamp(rateBRef.current + 0.05));
+          break;
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // 오토모드 비활성화 시 정리
   useEffect(() => {
@@ -67,7 +115,11 @@ export default function Home() {
   }, [autoMode]);
 
   // 오토모드: 크로스페이드 애니메이션 실행
-  function startAutoFade(target: number, durationMs: number, onDone?: () => void) {
+  function startAutoFade(
+    target: number,
+    durationMs: number,
+    onDone?: () => void,
+  ) {
     if (fadeIntervalRef.current) {
       clearInterval(fadeIntervalRef.current);
     }
@@ -91,15 +143,17 @@ export default function Home() {
             ? 2 * progress * progress
             : 1 - Math.pow(-2 * progress + 2, 2) / 2;
         const delta = target - startValue;
-        setCrossfader(
-          Math.round((startValue + delta * eased) * 1000) / 1000
-        );
+        setCrossfader(Math.round((startValue + delta * eased) * 1000) / 1000);
       }
     }, intervalMs);
   }
 
   // 오토모드: 시간 업데이트 핸들러
-  function handleAutoTimeUpdate(deckId: DeckId, currentTime: number, duration: number) {
+  function handleAutoTimeUpdate(
+    deckId: DeckId,
+    currentTime: number,
+    duration: number,
+  ) {
     if (!autoMode || duration === 0) return;
     if (deckId !== activeDeckRef.current) return;
 
@@ -139,7 +193,7 @@ export default function Home() {
     projWindowRef.current = window.open(
       "/projection",
       "dj-projection",
-      "popup"
+      "popup",
     );
   }
 
@@ -168,7 +222,7 @@ export default function Home() {
         const newIndex = prev.currentIndex === -1 ? 0 : prev.currentIndex;
         return { ...prev, queue: newQueue, currentIndex: newIndex };
       }),
-    []
+    [],
   );
   const handleAddTrackB = useCallback(
     (tracks: Track[]) =>
@@ -177,17 +231,17 @@ export default function Home() {
         const newIndex = prev.currentIndex === -1 ? 0 : prev.currentIndex;
         return { ...prev, queue: newQueue, currentIndex: newIndex };
       }),
-    []
+    [],
   );
 
   // --- 덱 A 핸들러 ---
   const handleDeckAIndexChange = useCallback(
     (currentIndex: number) => setDeckA((prev) => ({ ...prev, currentIndex })),
-    []
+    [],
   );
   const handleDeckAVolumeChange = useCallback(
     (volume: number) => setDeckA((prev) => ({ ...prev, volume })),
-    []
+    [],
   );
   const handleDeckATitleUpdate = useCallback(
     (index: number, title: string) =>
@@ -196,17 +250,17 @@ export default function Home() {
         if (queue[index]) queue[index] = { ...queue[index], title };
         return { ...prev, queue };
       }),
-    []
+    [],
   );
 
   // --- 덱 B 핸들러 ---
   const handleDeckBIndexChange = useCallback(
     (currentIndex: number) => setDeckB((prev) => ({ ...prev, currentIndex })),
-    []
+    [],
   );
   const handleDeckBVolumeChange = useCallback(
     (volume: number) => setDeckB((prev) => ({ ...prev, volume })),
-    []
+    [],
   );
   const handleDeckBTitleUpdate = useCallback(
     (index: number, title: string) =>
@@ -215,14 +269,14 @@ export default function Home() {
         if (queue[index]) queue[index] = { ...queue[index], title };
         return { ...prev, queue };
       }),
-    []
+    [],
   );
 
   // --- 큐 조작 (공통 팩토리) ---
   function makeQueueHandlers(
     setter: React.Dispatch<React.SetStateAction<DeckState>>,
     deckRef: React.RefObject<DjDeckHandle | null>,
-    getDeck: () => DeckState
+    getDeck: () => DeckState,
   ) {
     return {
       onSelect: (index: number) => {
@@ -238,9 +292,7 @@ export default function Home() {
           let newIndex = prev.currentIndex;
           if (index === prev.currentIndex) {
             newIndex =
-              newQueue.length > 0
-                ? Math.min(index, newQueue.length - 1)
-                : -1;
+              newQueue.length > 0 ? Math.min(index, newQueue.length - 1) : -1;
           } else if (index < prev.currentIndex) {
             newIndex = prev.currentIndex - 1;
           }
@@ -272,6 +324,27 @@ export default function Home() {
           else if (prev.currentIndex === index + 1) newIndex = index;
           return { ...prev, queue: newQueue, currentIndex: newIndex };
         }),
+      onReorder: (fromIndex: number, toIndex: number) =>
+        setter((prev) => {
+          const newQueue = [...prev.queue];
+          const [moved] = newQueue.splice(fromIndex, 1);
+          newQueue.splice(toIndex, 0, moved);
+          let newIndex = prev.currentIndex;
+          if (prev.currentIndex === fromIndex) {
+            newIndex = toIndex;
+          } else if (
+            fromIndex < prev.currentIndex &&
+            toIndex >= prev.currentIndex
+          ) {
+            newIndex = prev.currentIndex - 1;
+          } else if (
+            fromIndex > prev.currentIndex &&
+            toIndex <= prev.currentIndex
+          ) {
+            newIndex = prev.currentIndex + 1;
+          }
+          return { ...prev, queue: newQueue, currentIndex: newIndex };
+        }),
     };
   }
 
@@ -301,7 +374,6 @@ export default function Home() {
             isProjecting={projectDeck === "A"}
             autoMode={autoMode}
             onVolumeChange={handleDeckAVolumeChange}
-            onAddTrack={handleAddTrackA}
             onCurrentIndexChange={handleDeckAIndexChange}
             onTitleUpdate={handleDeckATitleUpdate}
             onTimeUpdate={(ct, dur) => handleAutoTimeUpdate("A", ct, dur)}
@@ -321,7 +393,6 @@ export default function Home() {
             isProjecting={projectDeck === "B"}
             autoMode={autoMode}
             onVolumeChange={handleDeckBVolumeChange}
-            onAddTrack={handleAddTrackB}
             onCurrentIndexChange={handleDeckBIndexChange}
             onTitleUpdate={handleDeckBTitleUpdate}
             onTimeUpdate={(ct, dur) => handleAutoTimeUpdate("B", ct, dur)}
@@ -428,6 +499,17 @@ export default function Home() {
         )}
       </div>
 
+      {/* 스마트 큐-인 버튼 */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowSmartQueue(true)}
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-foreground/20 bg-foreground text-base text-background transition-opacity hover:opacity-80"
+          title="스마트 큐-인 (재생목록 A/B 분배)"
+        >
+          +
+        </button>
+      </div>
+
       {/* 하단: 큐 영역 */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-foreground/10 bg-foreground/[0.03] p-4">
@@ -437,6 +519,7 @@ export default function Home() {
           <Queue
             tracks={deckA.queue}
             currentIndex={deckA.currentIndex}
+            onAddTrack={handleAddTrackA}
             {...queueHandlersA}
           />
         </div>
@@ -447,10 +530,22 @@ export default function Home() {
           <Queue
             tracks={deckB.queue}
             currentIndex={deckB.currentIndex}
+            onAddTrack={handleAddTrackB}
             {...queueHandlersB}
           />
         </div>
       </div>
+
+      {/* 스마트 큐-인 모달 */}
+      {showSmartQueue && (
+        <SmartQueueModal
+          queueALength={deckA.queue.length}
+          queueBLength={deckB.queue.length}
+          onAddTracksA={handleAddTrackA}
+          onAddTracksB={handleAddTrackB}
+          onClose={() => setShowSmartQueue(false)}
+        />
+      )}
     </div>
   );
 }

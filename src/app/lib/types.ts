@@ -2,6 +2,7 @@
 export interface Track {
   videoId: string;
   title: string; // 초기엔 'Video', 재생 시 실제 제목으로 갱신
+  thumbnail?: string; // YouTube 썸네일 URL
 }
 
 /** 덱 식별자 */

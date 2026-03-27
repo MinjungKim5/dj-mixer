@@ -78,7 +78,9 @@ input[type="range"].dj-slider::-webkit-slider-thumb {
   height: 28px;
   border-radius: 3px;
   background: var(--slider-thumb) !important;
-  box-shadow: 0 0 0 2px var(--slider-thumb-border), 0 1px 4px rgba(0,0,0,0.3);
+  box-shadow:
+    0 0 0 2px var(--slider-thumb-border),
+    0 1px 4px rgba(0, 0, 0, 0.3);
   margin-top: -10px;
 }
 input[type="range"].dj-slider::-moz-range-thumb {
@@ -87,7 +89,7 @@ input[type="range"].dj-slider::-moz-range-thumb {
   border-radius: 3px;
   border: 2px solid var(--slider-thumb-border);
   background: var(--slider-thumb) !important;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
 input[type="range"].dj-slider-v::-webkit-slider-thumb {
@@ -96,7 +98,9 @@ input[type="range"].dj-slider-v::-webkit-slider-thumb {
   height: 20px;
   border-radius: 3px;
   background: var(--slider-thumb) !important;
-  box-shadow: 0 0 0 2px var(--slider-thumb-border), 0 1px 4px rgba(0,0,0,0.3);
+  box-shadow:
+    0 0 0 2px var(--slider-thumb-border),
+    0 1px 4px rgba(0, 0, 0, 0.3);
   margin-left: -10px;
 }
 input[type="range"].dj-slider-v::-moz-range-thumb {
@@ -105,7 +109,7 @@ input[type="range"].dj-slider-v::-moz-range-thumb {
   border-radius: 3px;
   border: 2px solid var(--slider-thumb-border);
   background: var(--slider-thumb) !important;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
 input[type="range"].dj-slider:hover::-webkit-slider-thumb,
@@ -139,7 +143,9 @@ input[type="range"].dj-timeline::-webkit-slider-thumb {
   height: 12px;
   border-radius: 50%;
   background: var(--slider-thumb) !important;
-  box-shadow: 0 0 0 1.5px var(--slider-thumb-border), 0 1px 3px rgba(0,0,0,0.2);
+  box-shadow:
+    0 0 0 1.5px var(--slider-thumb-border),
+    0 1px 3px rgba(0, 0, 0, 0.2);
   margin-top: -4px;
 }
 input[type="range"].dj-timeline::-moz-range-thumb {
@@ -148,5 +154,103 @@ input[type="range"].dj-timeline::-moz-range-thumb {
   border-radius: 50%;
   border: 1.5px solid var(--slider-thumb-border);
   background: var(--slider-thumb) !important;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* ── 재생 타임라인 (넓은 클릭 영역) ── */
+
+input[type="range"].dj-playbar::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--foreground);
+  opacity: 0.15;
+}
+input[type="range"].dj-playbar::-moz-range-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--foreground);
+  opacity: 0.15;
+}
+input[type="range"].dj-playbar::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--slider-thumb) !important;
+  box-shadow:
+    0 0 0 1.5px var(--slider-thumb-border),
+    0 1px 3px rgba(0, 0, 0, 0.2);
+  margin-top: -3px;
+}
+input[type="range"].dj-playbar::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid var(--slider-thumb-border);
+  background: var(--slider-thumb) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+input[type="range"].dj-playbar {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* ── 덱 너울 애니메이션 ── */
+
+@keyframes deck-wave-1 {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes deck-wave-2 {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.deck-wave {
+  position: relative;
+  overflow: hidden;
+}
+/* 첫 번째 너울: 하단 25% */
+.deck-wave::before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 10%;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(to top, rgba(59, 130, 246, 0.25), transparent);
+  animation: deck-wave-1 3s ease-in-out infinite;
+}
+/* 두 번째 너울: 약간 위, 엇갈림 */
+.deck-wave::after {
+  content: "";
+  position: absolute;
+  bottom: 8%;
+  left: 0;
+  right: 0;
+  height: 8%;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(to top, rgba(59, 130, 246, 0.15), transparent);
+  animation: deck-wave-2 4s ease-in-out infinite;
+}
+.dark .deck-wave::before {
+  background: linear-gradient(to top, rgba(96, 165, 250, 0.3), transparent);
+}
+.dark .deck-wave::after {
+  background: linear-gradient(to top, rgba(96, 165, 250, 0.18), transparent);
 }

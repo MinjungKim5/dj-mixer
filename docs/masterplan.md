@@ -181,14 +181,20 @@ interface MixerState {
 - [x] 크로스페이더 명령어 입력 (`lN` 왼쪽, `rN` 오른쪽, `mN` 중앙 — N은 100ms 단위 시간)
 - [x] 자동재생모드 (A↔B 순차재생, 크로스페이드, 프로젝션 자동전환, 📼 토글)
 
-### Phase 4: UI/UX
+### Phase 4: UI/UX + YouTube Data API
 
 - [x] 슬라이더 커스텀 스타일링 (두꺼운 트랙, 사각형 썸, 눈금)
-- [ ] 드래그앤드롭 큐 순서변경
-- [ ] 현재 재생 곡 하이라이트
+- [x] YouTube Data API 연동 (제목/썸네일 메타데이터, 클라이언트 직접 호출)
+- [x] 재생목록 URL 지원 + 스마트 큐-인 (A/B 교대 분배, 단일 곡은 짧은 큐에 자동)
+- [x] TrackInput을 Queue 상단으로 이동 (DjDeck에서 분리)
+- [x] 드래그앤드롭 큐 순서변경 (HTML5 DnD, 기존 ▲▼ 버튼 유지)
+- [x] 현재 재생 곡 하이라이트 (좌측 border accent + 썸네일 표시)
+- [x] 덱 재생 중 너울 애니메이션 (CSS ::before/::after opacity 파동)
+- [x] 재생바 두께 증가 (dj-playbar: 8px 트랙 + 14px 썸)
+- [x] 덱 상태 표시 (READY / ON AIR)
+- [x] 키보드 단축키 (e.code 기반 — 한글/CapsLock 무관: A/B 재생토글, 배속 조절, 스마트큐 모달)
 
 ### Phase 5: 추후 확장 (미포함)
 
-- [ ] YouTube Data API 연동 (제목/썸네일 메타데이터)
 - [ ] BPM 감지 / 싱크
 - [ ] 이퀄라이저 (Web Audio API)

@@ -9,7 +9,6 @@ import {
   useImperativeHandle,
 } from "react";
 import YouTubePlayer from "./YouTubePlayer";
-import TrackInput from "./TrackInput";
 import type { YouTubePlayerHandle } from "./YouTubePlayer";
 import type { DeckId, Track } from "../lib/types";
 import { sendProjection } from "../lib/projection";
@@ -23,6 +22,7 @@ function formatTime(seconds: number): string {
 export interface DjDeckHandle {
   play(): void;
   pause(): void;
+  togglePlay(): void;
   /** 특정 곡을 로드하고 재생 */
   loadAndPlay(videoId: string): void;
   /** 다음 곡을 로드 후 즉시 정지 (스탠바이) */
@@ -39,7 +39,6 @@ interface DjDeckProps {
   isProjecting: boolean; // 이 덱이 현재 프로젝션 출력 대상인지
   autoMode?: boolean; // 오토모드 활성 여부
   onVolumeChange: (volume: number) => void;
-  onAddTrack: (tracks: Track[]) => void;
   onCurrentIndexChange: (index: number) => void;
   onTitleUpdate: (index: number, title: string) => void;
   onTimeUpdate?: (currentTime: number, duration: number) => void;
@@ -55,7 +54,6 @@ const DjDeck = forwardRef<DjDeckHandle, DjDeckProps>(function DjDeck({
   isProjecting,
   autoMode,
   onVolumeChange,
-  onAddTrack,
   onCurrentIndexChange,
   onTitleUpdate,
   onTimeUpdate,
@@ -89,6 +87,19 @@ const DjDeck = forwardRef<DjDeckHandle, DjDeckProps>(function DjDeck({
     pause() {
       playerRef.current?.pause();
       setIsPlaying(false);
+    },
+    togglePlay() {
+      if (!playerRef.current || queue.length === 0) return;
+      if (isPlaying) {
+        playerRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        if (currentIndex >= 0 && queue[currentIndex]) {
+          playerRef.current.loadVideo(queue[currentIndex].videoId);
+        }
+        playerRef.current.play();
+        setIsPlaying(true);
+      }
     },
     cueNext() {
       const nextIndex = currentIndex + 1;
@@ -216,19 +227,20 @@ const DjDeck = forwardRef<DjDeckHandle, DjDeckProps>(function DjDeck({
   const isA = deckId === "A";
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className={`relative flex flex-col gap-3 rounded-lg transition-all duration-700 ${
+      isPlaying ? "deck-wave" : ""
+    }`}>
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-bold tracking-wider text-foreground/70">
           DECK {deckId}
         </h2>
         {playerReady && (
-          <span className="text-[10px] text-green-500">READY</span>
+          <span className={`text-[10px] ${isPlaying ? "text-blue-400" : "text-green-500"}`}>
+            {isPlaying ? "ON AIR" : "READY"}
+          </span>
         )}
       </div>
-
-      {/* URL 입력 */}
-      <TrackInput onAddTrack={onAddTrack} />
 
       {/* 플레이어 + 세로 볼륨 */}
       <div className={`flex gap-2 ${isA ? "flex-row" : "flex-row-reverse"}`}>
@@ -309,7 +321,7 @@ const DjDeck = forwardRef<DjDeckHandle, DjDeckProps>(function DjDeck({
               max={duration || 1}
               value={currentTime}
               onChange={handleSeek}
-              className="dj-timeline flex-1 min-w-0"
+              className="dj-playbar flex-1 min-w-0"
             />
             <span className="text-[10px] font-mono text-foreground/50 tabular-nums">
               {formatTime(duration)}
