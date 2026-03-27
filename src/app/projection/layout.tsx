@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "DJ Mixer — Projection",
+  title: "ㅋㅁㅇ — Projection",
 };
 
 export default function ProjectionLayout({

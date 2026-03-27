@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DJ Mixer",
+  title: "ㅋㅁㅇ",
   description: "YouTube 기반 더블덱 DJ 믹싱 웹 앱",
 };
 
@@ -36,7 +36,7 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
           <AutoModeProvider>
             <header className="flex items-center justify-between px-6 py-4">
-              <h1 className="text-xl font-bold">🎧 DJ Mixer</h1>
+              <h1 className="text-xl font-bold">💿 ㅋㅁㅇ</h1>
               <div className="flex items-center gap-2">
                 <AutoModeToggle />
                 <ThemeToggle />
