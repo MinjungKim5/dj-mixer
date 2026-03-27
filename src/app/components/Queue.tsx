@@ -79,7 +79,7 @@ export default function Queue({
                 onDragOver={(e) => handleDragOver(e, i)}
                 onDrop={(e) => handleDrop(e, i)}
                 onDragEnd={handleDragEnd}
-                className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors cursor-pointer ${
+                className={`flex items-center gap-3 rounded-md px-3 py-3 text-sm transition-colors cursor-pointer ${
                   isCurrent
                     ? "border-l-2 border-green-500 bg-foreground/15 font-medium"
                     : "border-l-2 border-transparent hover:bg-foreground/5"
@@ -89,12 +89,12 @@ export default function Queue({
                 onClick={() => onSelect(i)}
               >
                 {/* 드래그 핸들 */}
-                <span className="cursor-grab text-[10px] text-foreground/30 active:cursor-grabbing">
+                <span className="cursor-grab text-sm text-foreground/30 active:cursor-grabbing">
                   ⠿
                 </span>
 
                 {/* 트랙 번호 & 재생 표시 */}
-                <span className="w-5 shrink-0 text-center text-xs text-foreground/50">
+                <span className="w-6 shrink-0 text-center text-sm text-foreground/50">
                   {isCurrent ? "▶" : i + 1}
                 </span>
 
@@ -103,23 +103,23 @@ export default function Queue({
                   <img
                     src={track.thumbnail}
                     alt=""
-                    className="h-7 w-10 rounded object-cover shrink-0"
+                    className="h-10 w-14 rounded object-cover shrink-0"
                     draggable={false}
                   />
                 )}
 
                 {/* 제목 */}
-                <span className="flex-1 truncate">{track.title}</span>
+                <span className="flex-1 truncate text-sm">{track.title}</span>
 
                 {/* 컨트롤 버튼 */}
-                <div className="flex shrink-0 gap-0.5">
+                <div className="flex shrink-0 gap-1">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       onMoveUp(i);
                     }}
                     disabled={i === 0}
-                    className="rounded p-0.5 text-xs text-foreground/40 hover:text-foreground disabled:opacity-20"
+                    className="rounded p-1 text-sm text-foreground/40 hover:text-foreground disabled:opacity-20"
                     aria-label="위로 이동"
                   >
                     ▲
@@ -130,7 +130,7 @@ export default function Queue({
                       onMoveDown(i);
                     }}
                     disabled={i === tracks.length - 1}
-                    className="rounded p-0.5 text-xs text-foreground/40 hover:text-foreground disabled:opacity-20"
+                    className="rounded p-1 text-sm text-foreground/40 hover:text-foreground disabled:opacity-20"
                     aria-label="아래로 이동"
                   >
                     ▼
@@ -140,7 +140,7 @@ export default function Queue({
                       e.stopPropagation();
                       onRemove(i);
                     }}
-                    className="rounded p-0.5 text-xs text-foreground/40 hover:text-red-500"
+                    className="rounded p-1 text-sm text-foreground/40 hover:text-red-500"
                     aria-label="삭제"
                   >
                     ✕
