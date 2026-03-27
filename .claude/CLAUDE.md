@@ -1,5 +1,4 @@
 프로젝트 계획은 @docs/masterplan.md 참조
-로컬 프로젝트로 github 배포 금지
 
 ## 학습 노트
 
