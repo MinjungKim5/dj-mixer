@@ -76,6 +76,7 @@ export default function Home() {
 
       switch (e.code) {
         case "KeyQ":
+          e.preventDefault();
           setShowSmartQueue((prev) => !prev);
           break;
         case "KeyA":
@@ -353,11 +354,10 @@ export default function Home() {
 
   return (
     <div
-      className={`flex flex-1 flex-col gap-4 px-4 pb-6 sm:px-6 transition-shadow duration-500 ${
-        autoMode
+      className={`flex flex-1 flex-col gap-4 px-4 pb-6 sm:px-6 transition-shadow duration-500 ${autoMode
           ? "rounded-xl shadow-[inset_0_0_60px_rgba(34,197,94,0.2),inset_0_0_0_1px_rgba(34,197,94,0.4)]"
           : ""
-      }`}
+        }`}
     >
       {/* 상단: 덱 영역 (플레이어 + 볼륨) + 크로스페이더 */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -482,11 +482,10 @@ export default function Home() {
             <button
               key={id}
               onClick={() => toggleProjectDeck(id)}
-              className={`px-3 py-1.5 font-medium transition-colors ${
-                projectDeck === id
+              className={`px-3 py-1.5 font-medium transition-colors ${projectDeck === id
                   ? "bg-foreground text-background"
                   : "bg-foreground/5 text-foreground/60 hover:bg-foreground/10"
-              }`}
+                }`}
             >
               Deck {id}
             </button>
