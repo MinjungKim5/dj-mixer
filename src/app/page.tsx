@@ -10,6 +10,8 @@ import SmartQueueModal from "./components/SmartQueueModal";
 import type { DeckId, Track } from "./lib/types";
 import { sendProjection } from "./lib/projection";
 import { useAutoMode, AUTO_CONFIG } from "./lib/automode";
+import { parseYouTubeUrl } from "./lib/parseUrl";
+import { fetchVideosMetadata } from "./lib/youtubeData";
 
 interface DeckState {
   queue: Track[];
@@ -46,6 +48,14 @@ export default function Home() {
   const [projectDeck, setProjectDeck] = useState<DeckId | null>(null);
   const [showSmartQueue, setShowSmartQueue] = useState(false);
   const projWindowRef = useRef<Window | null>(null);
+
+  const [syncPlaylist, setSyncPlaylist] = useState("");
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const stateARef = useRef(deckA);
+  stateARef.current = deckA;
+  const stateBRef = useRef(deckB);
+  stateBRef.current = deckB;
 
   // 오토모드
   const { enabled: autoMode } = useAutoMode();
@@ -114,6 +124,123 @@ export default function Home() {
       }
     }
   }, [autoMode]);
+
+  // 구글 시트 재생목록 자동 동기화
+  useEffect(() => {
+    if (!isSyncing || !syncPlaylist) return;
+
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    async function fetchPlaylist() {
+      try {
+        // Use a CORS proxy since the target API does not set Access-Control-Allow-Origin for localhost
+        // 캐시를 방지하기 위해 URL에 고유 타임스탬프 파라미터를 붙입니다.
+        const targetUrl = encodeURIComponent(`https://super-simple-sheet.space/json/${syncPlaylist}?t=${Date.now()}`);
+        const res = await fetch(`https://corsproxy.io/?${targetUrl}`, {
+          cache: "no-store",
+          headers: {
+            "Pragma": "no-cache",
+            "Cache-Control": "no-cache"
+          }
+        });
+        if (!res.ok) throw new Error("Failed to fetch playlist");
+        const data = await res.json();
+        
+        const fetchedA: Track[] = [];
+        const fetchedB: Track[] = [];
+
+        if (Array.isArray(data)) {
+          for (const r of data) {
+            if (r.A) {
+              const parsed = parseYouTubeUrl(r.A);
+              if (parsed.videoId) {
+                fetchedA.push({ videoId: parsed.videoId, title: r["A제목"] || "Video" });
+              }
+            }
+            if (r.B) {
+              const parsed = parseYouTubeUrl(r.B);
+              if (parsed.videoId) {
+                fetchedB.push({ videoId: parsed.videoId, title: r["B제목"] || "Video" });
+              }
+            }
+          }
+        }
+
+        // 기존 큐에서 메타데이터 복원 및 누락된 ID 수집
+        const missingIds = new Set<string>();
+        const allFetched = [...fetchedA, ...fetchedB];
+        allFetched.forEach(t => {
+           const inA = stateARef.current.queue.find(x => x.videoId === t.videoId);
+           const inB = stateBRef.current.queue.find(x => x.videoId === t.videoId);
+           const existing = inA || inB;
+           if (existing && existing.title !== "Video") {
+              t.title = existing.title;
+              t.thumbnail = existing.thumbnail;
+           } else if (t.title === "Video" || !t.title) {
+              missingIds.add(t.videoId);
+           }
+        });
+
+        // 누락된 메타데이터 일괄 가져오기 기능 연동
+        if (missingIds.size > 0) {
+           try {
+             const metaMap = await fetchVideosMetadata(Array.from(missingIds));
+             allFetched.forEach(t => {
+                if (metaMap.has(t.videoId)) {
+                   t.title = metaMap.get(t.videoId)!.title;
+                   t.thumbnail = metaMap.get(t.videoId)!.thumbnail;
+                }
+             });
+           } catch(e) {
+             console.error("Batch Meta Fetch Error:", e);
+           }
+        }
+
+        const applySmartSync = (
+          fetchedQueue: Track[],
+          setter: React.Dispatch<React.SetStateAction<DeckState>>
+        ) => {
+          setter((prev) => {
+            const historyLen = Math.max(0, prev.currentIndex + 1);
+            const historyQueue = prev.queue.slice(0, historyLen);
+
+            let matchIdx = -1;
+            for (let i = historyQueue.length - 1; i >= 0; i--) {
+              const hTrack = historyQueue[i];
+              matchIdx = fetchedQueue.findIndex((t) => t.videoId === hTrack.videoId);
+              if (matchIdx !== -1) break;
+            }
+
+            const upcomingQueue = matchIdx !== -1 ? fetchedQueue.slice(matchIdx + 1) : fetchedQueue;
+            const newQueue = [...historyQueue, ...upcomingQueue];
+
+            // 큐가 동일한지 대략적인 비교 후 상태변경 최소화
+            const oldStr = JSON.stringify(prev.queue);
+            const newStr = JSON.stringify(newQueue);
+            if (oldStr === newStr) return prev;
+
+            return { ...prev, queue: newQueue };
+          });
+        };
+
+        applySmartSync(fetchedA, setDeckA);
+        applySmartSync(fetchedB, setDeckB);
+
+      } catch (err) {
+        console.error("Sheet Sync Error:", err);
+      } finally {
+        if (isSyncing) {
+          timeoutId = setTimeout(fetchPlaylist, 15000); // 15초 폴링
+        }
+      }
+    }
+
+    fetchPlaylist();
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [isSyncing, syncPlaylist]);
 
   // 오토모드: 크로스페이드 애니메이션 실행
   function startAutoFade(
@@ -498,12 +625,42 @@ export default function Home() {
         )}
       </div>
 
-      {/* 스마트 큐-인 버튼 */}
-      <div className="flex justify-end">
+      {/* 큐 연동 및 스마트 큐-인 버튼 */}
+      <div className="flex items-center justify-end gap-3">
+        <div className="flex flex-1 max-w-sm items-center gap-2 rounded-lg border border-foreground/20 bg-foreground/[0.03] p-1.5 focus-within:border-foreground/40 transition-colors">
+          <input
+            type="text"
+            placeholder="시트 재생목록 (예: 플레이리스트260329)"
+            value={syncPlaylist}
+            onChange={(e) => setSyncPlaylist(e.target.value)}
+            disabled={isSyncing}
+            className="flex-1 bg-transparent px-2 py-0.5 text-sm font-medium text-foreground placeholder-foreground/30 outline-none disabled:opacity-50"
+          />
+          <button
+            onClick={() => setIsSyncing(!isSyncing)}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold tracking-wide transition-colors ${
+              isSyncing
+                ? "bg-green-500/90 text-white shadow-md shadow-green-500/20"
+                : "bg-foreground/10 text-foreground/60 hover:bg-foreground/20"
+            }`}
+          >
+            {isSyncing ? (
+              <>
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75"></span>
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-white"></span>
+                </span>
+                SYNCING
+              </>
+            ) : (
+              "SYNC"
+            )}
+          </button>
+        </div>
         <button
           onClick={() => setShowSmartQueue(true)}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-foreground/20 bg-foreground text-base text-background transition-opacity hover:opacity-80"
-          title="스마트 큐-인 (재생목록 A/B 분배)"
+          className="flex h-10 w-10 items-center justify-center rounded-lg border border-foreground/20 bg-foreground text-xl font-light text-background transition-opacity hover:opacity-80 shadow-sm"
+          title="스마트 큐-인 (수동 A/B 분배)"
         >
           +
         </button>

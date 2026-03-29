@@ -21,6 +21,37 @@ export async function fetchVideoMetadata(videoId: string): Promise<Track> {
   };
 }
 
+/** 여러 영상의 메타데이터를 한 번에 가져온다 (최대 50개 단위 청크 처리) */
+export async function fetchVideosMetadata(videoIds: string[]): Promise<Map<string, Track>> {
+  if (!API_KEY || videoIds.length === 0) return new Map();
+  
+  const resultMap = new Map<string, Track>();
+  
+  // 50개(유튜브 API 최대 허용치) 단위로 잘라서 요청
+  for (let i = 0; i < videoIds.length; i += 50) {
+    const chunk = videoIds.slice(i, i + 50);
+    const url = `${BASE}/videos?part=snippet&id=${chunk.join(",")}&key=${API_KEY}`;
+    
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      
+      const data = await res.json();
+      for (const item of data.items ?? []) {
+        resultMap.set(item.id, {
+          videoId: item.id,
+          title: item.snippet.title,
+          thumbnail: item.snippet.thumbnails?.default?.url,
+        });
+      }
+    } catch (err) {
+      console.error("Batch YouTube Fetch Error:", err);
+    }
+  }
+
+  return resultMap;
+}
+
 /** 재생목록의 모든 영상을 가져온다 (페이지네이션 포함, 최대 200곡) */
 export async function fetchPlaylistTracks(
   playlistId: string
