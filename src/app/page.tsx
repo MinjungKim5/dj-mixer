@@ -133,10 +133,9 @@ export default function Home() {
 
     async function fetchPlaylist() {
       try {
-        // Use a CORS proxy since the target API does not set Access-Control-Allow-Origin for localhost
-        // 캐시를 방지하기 위해 URL에 고유 타임스탬프 파라미터를 붙입니다.
-        const targetUrl = encodeURIComponent(`https://super-simple-sheet.space/json/${syncPlaylist}?t=${Date.now()}`);
-        const res = await fetch(`https://corsproxy.io/?${targetUrl}`, {
+        // Use a direct fetch since the target server now supports CORS.
+        const targetUrl = `https://super-simple-sheet.space/json/${syncPlaylist}?t=${Date.now()}`;
+        const res = await fetch(targetUrl, {
           cache: "no-store",
           headers: {
             "Pragma": "no-cache",
