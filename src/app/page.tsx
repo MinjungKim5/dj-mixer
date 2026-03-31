@@ -11,7 +11,7 @@ import type { DeckId, Track } from "./lib/types";
 import { sendProjection } from "./lib/projection";
 import { useAutoMode, AUTO_CONFIG } from "./lib/automode";
 import { parseYouTubeUrl } from "./lib/parseUrl";
-import { fetchVideosMetadata } from "./lib/youtubeData";
+import { fetchVideosMetadata, fetchPlaylistTracks } from "./lib/youtubeData";
 
 interface DeckState {
   queue: Track[];
@@ -49,13 +49,44 @@ export default function Home() {
   const [showSmartQueue, setShowSmartQueue] = useState(false);
   const projWindowRef = useRef<Window | null>(null);
 
-  const [syncPlaylist, setSyncPlaylist] = useState("");
-  const [isSyncing, setIsSyncing] = useState(false);
-
   const stateARef = useRef(deckA);
   stateARef.current = deckA;
   const stateBRef = useRef(deckB);
   stateBRef.current = deckB;
+
+  const [syncPlaylist, setSyncPlaylist] = useState("");
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const [syncYTPlaylist, setSyncYTPlaylist] = useState("");
+  const [isYTSyncing, setIsYTSyncing] = useState(false);
+
+  // 스마트 동기화 로직 (구글 시트 & 유튜브 공통)
+  const applySmartSync = useCallback((
+    fetchedQueue: Track[],
+    setter: React.Dispatch<React.SetStateAction<DeckState>>
+  ) => {
+    setter((prev) => {
+      const historyLen = Math.max(0, prev.currentIndex + 1);
+      const historyQueue = prev.queue.slice(0, historyLen);
+
+      let matchIdx = -1;
+      for (let i = historyQueue.length - 1; i >= 0; i--) {
+        const hTrack = historyQueue[i];
+        matchIdx = fetchedQueue.findIndex((t) => t.videoId === hTrack.videoId);
+        if (matchIdx !== -1) break;
+      }
+
+      const upcomingQueue = matchIdx !== -1 ? fetchedQueue.slice(matchIdx + 1) : fetchedQueue;
+      const newQueue = [...historyQueue, ...upcomingQueue];
+
+      // 큐가 동일한지 대략적인 비교 후 상태변경 최소화
+      const oldStr = JSON.stringify(prev.queue);
+      const newStr = JSON.stringify(newQueue);
+      if (oldStr === newStr) return prev;
+
+      return { ...prev, queue: newQueue };
+    });
+  }, []);
 
   // 오토모드
   const { enabled: autoMode } = useAutoMode();
@@ -127,6 +158,7 @@ export default function Home() {
 
   // 구글 시트 재생목록 자동 동기화
   useEffect(() => {
+    let active = true;
     if (!isSyncing || !syncPlaylist) return;
 
     let timeoutId: ReturnType<typeof setTimeout>;
@@ -195,51 +227,73 @@ export default function Home() {
            }
         }
 
-        const applySmartSync = (
-          fetchedQueue: Track[],
-          setter: React.Dispatch<React.SetStateAction<DeckState>>
-        ) => {
-          setter((prev) => {
-            const historyLen = Math.max(0, prev.currentIndex + 1);
-            const historyQueue = prev.queue.slice(0, historyLen);
-
-            let matchIdx = -1;
-            for (let i = historyQueue.length - 1; i >= 0; i--) {
-              const hTrack = historyQueue[i];
-              matchIdx = fetchedQueue.findIndex((t) => t.videoId === hTrack.videoId);
-              if (matchIdx !== -1) break;
-            }
-
-            const upcomingQueue = matchIdx !== -1 ? fetchedQueue.slice(matchIdx + 1) : fetchedQueue;
-            const newQueue = [...historyQueue, ...upcomingQueue];
-
-            // 큐가 동일한지 대략적인 비교 후 상태변경 최소화
-            const oldStr = JSON.stringify(prev.queue);
-            const newStr = JSON.stringify(newQueue);
-            if (oldStr === newStr) return prev;
-
-            return { ...prev, queue: newQueue };
-          });
-        };
-
-        applySmartSync(fetchedA, setDeckA);
-        applySmartSync(fetchedB, setDeckB);
+        if (active) {
+          applySmartSync(fetchedA, setDeckA);
+          applySmartSync(fetchedB, setDeckB);
+        }
 
       } catch (err) {
-        console.error("Sheet Sync Error:", err);
+        if (active) console.error("Sheet Sync Error:", err);
       } finally {
-        if (isSyncing) {
+        if (active && isSyncing) {
           timeoutId = setTimeout(fetchPlaylist, 15000); // 15초 폴링
         }
       }
     }
 
-    fetchPlaylist();
+    if (active) fetchPlaylist();
 
     return () => {
+      active = false;
       clearTimeout(timeoutId);
     };
-  }, [isSyncing, syncPlaylist]);
+  }, [isSyncing, syncPlaylist, applySmartSync]);
+
+  // YouTube 재생목록 자동 동기화
+  useEffect(() => {
+    let active = true;
+    if (!isYTSyncing || !syncYTPlaylist) return;
+
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    async function fetchYTPlaylist() {
+      try {
+        const parsed = parseYouTubeUrl(syncYTPlaylist);
+        if (!parsed.playlistId) throw new Error("Invalid Playlist URL");
+
+        const tracks = await fetchPlaylistTracks(parsed.playlistId);
+        
+        if (tracks.length === 0) return;
+
+        // A/B 교대 분배 (스마트 큐 인 규칙)
+        const fetchedA: Track[] = [];
+        const fetchedB: Track[] = [];
+        tracks.forEach((track, i) => {
+          if (i % 2 === 0) fetchedA.push(track);
+          else fetchedB.push(track);
+        });
+
+        if (active) {
+          applySmartSync(fetchedA, setDeckA);
+          applySmartSync(fetchedB, setDeckB);
+        }
+
+      } catch (err) {
+        if (active) console.error("YouTube Sync Error:", err);
+      } finally {
+        if (active && isYTSyncing) {
+          timeoutId = setTimeout(fetchYTPlaylist, 30000); // 30초 폴링
+        }
+      }
+    }
+
+    if (active) fetchYTPlaylist();
+
+    return () => {
+      active = false;
+      clearTimeout(timeoutId);
+    };
+  }, [isYTSyncing, syncYTPlaylist, applySmartSync]);
 
   // 오토모드: 크로스페이드 애니메이션 실행
   function startAutoFade(
@@ -625,44 +679,79 @@ export default function Home() {
       </div>
 
       {/* 큐 연동 및 스마트 큐-인 버튼 */}
-      <div className="flex items-center justify-end gap-3">
-        <div className="flex flex-1 max-w-sm items-center gap-2 rounded-lg border border-foreground/20 bg-foreground/[0.03] p-1.5 focus-within:border-foreground/40 transition-colors">
-          <input
-            type="text"
-            placeholder="시트 재생목록 (예: 플레이리스트260329)"
-            value={syncPlaylist}
-            onChange={(e) => setSyncPlaylist(e.target.value)}
-            disabled={isSyncing}
-            className="flex-1 bg-transparent px-2 py-0.5 text-sm font-medium text-foreground placeholder-foreground/30 outline-none disabled:opacity-50"
-          />
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-end gap-3">
+          <div className="flex flex-1 max-w-sm items-center gap-2 rounded-lg border border-foreground/20 bg-foreground/[0.03] p-1.5 focus-within:border-foreground/40 transition-colors">
+            <input
+              type="text"
+              placeholder="YouTube 재생목록 (URL 또는 ID)"
+              value={syncYTPlaylist}
+              onChange={(e) => setSyncYTPlaylist(e.target.value)}
+              disabled={isYTSyncing}
+              className="flex-1 bg-transparent px-2 py-0.5 text-sm font-medium text-foreground placeholder-foreground/30 outline-none disabled:opacity-50"
+            />
+            <button
+              onClick={() => setIsYTSyncing(!isYTSyncing)}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold tracking-wide transition-colors ${
+                isYTSyncing
+                  ? "bg-red-500/90 text-white shadow-md shadow-red-500/20"
+                  : "bg-foreground/10 text-foreground/60 hover:bg-foreground/20"
+              }`}
+            >
+              {isYTSyncing ? (
+                <>
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75"></span>
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-white"></span>
+                  </span>
+                  YT SYNCING
+                </>
+              ) : (
+                "YT SYNC"
+              )}
+            </button>
+          </div>
+          <div className="w-10" /> {/* 간격 맞춤용 */}
+        </div>
+        <div className="flex items-center justify-end gap-3">
+          <div className="flex flex-1 max-w-sm items-center gap-2 rounded-lg border border-foreground/20 bg-foreground/[0.03] p-1.5 focus-within:border-foreground/40 transition-colors">
+            <input
+              type="text"
+              placeholder="시트 재생목록 (예: 플레이리스트260329)"
+              value={syncPlaylist}
+              onChange={(e) => setSyncPlaylist(e.target.value)}
+              disabled={isSyncing}
+              className="flex-1 bg-transparent px-2 py-0.5 text-sm font-medium text-foreground placeholder-foreground/30 outline-none disabled:opacity-50"
+            />
+            <button
+              onClick={() => setIsSyncing(!isSyncing)}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold tracking-wide transition-colors ${
+                isSyncing
+                  ? "bg-green-500/90 text-white shadow-md shadow-green-500/20"
+                  : "bg-foreground/10 text-foreground/60 hover:bg-foreground/20"
+              }`}
+            >
+              {isSyncing ? (
+                <>
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75"></span>
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-white"></span>
+                  </span>
+                  SYNCING
+                </>
+              ) : (
+                "SYNC"
+              )}
+            </button>
+          </div>
           <button
-            onClick={() => setIsSyncing(!isSyncing)}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold tracking-wide transition-colors ${
-              isSyncing
-                ? "bg-green-500/90 text-white shadow-md shadow-green-500/20"
-                : "bg-foreground/10 text-foreground/60 hover:bg-foreground/20"
-            }`}
+            onClick={() => setShowSmartQueue(true)}
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-foreground/20 bg-foreground text-xl font-light text-background transition-opacity hover:opacity-80 shadow-sm"
+            title="스마트 큐-인 (수동 A/B 분배)"
           >
-            {isSyncing ? (
-              <>
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75"></span>
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-white"></span>
-                </span>
-                SYNCING
-              </>
-            ) : (
-              "SYNC"
-            )}
+            +
           </button>
         </div>
-        <button
-          onClick={() => setShowSmartQueue(true)}
-          className="flex h-10 w-10 items-center justify-center rounded-lg border border-foreground/20 bg-foreground text-xl font-light text-background transition-opacity hover:opacity-80 shadow-sm"
-          title="스마트 큐-인 (수동 A/B 분배)"
-        >
-          +
-        </button>
       </div>
 
       {/* 하단: 큐 영역 */}
