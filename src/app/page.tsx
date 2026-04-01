@@ -82,9 +82,8 @@ export default function Home() {
       // 큐가 동일한지 대략적인 비교 후 상태변경 최소화
       const oldStr = JSON.stringify(prev.queue);
       const newStr = JSON.stringify(newQueue);
-      if (oldStr === newStr) return prev;
-
-      return { ...prev, queue: newQueue };
+      const newIndex = (prev.currentIndex === -1 && newQueue.length > 0) ? 0 : prev.currentIndex;
+      return { ...prev, queue: newQueue, currentIndex: newIndex };
     });
   }, []);
 

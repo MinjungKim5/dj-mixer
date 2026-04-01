@@ -64,6 +64,7 @@ const DjDeck = forwardRef<DjDeckHandle, DjDeckProps>(function DjDeck({
   const [playerReady, setPlayerReady] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const loadedVideoIdRef = useRef<string | null>(null);
   const timeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onTimeUpdateRef = useRef(onTimeUpdate);
   onTimeUpdateRef.current = onTimeUpdate;
@@ -72,8 +73,18 @@ const DjDeck = forwardRef<DjDeckHandle, DjDeckProps>(function DjDeck({
   useImperativeHandle(ref, () => ({
     play() {
       if (!playerRef.current || queue.length === 0) return;
-      if (currentIndex >= 0 && queue[currentIndex]) {
-        playerRef.current.loadVideo(queue[currentIndex].videoId);
+      let targetIndex = currentIndex;
+      if (targetIndex === -1 && queue.length > 0) {
+        targetIndex = 0;
+        onCurrentIndexChange(0);
+      }
+
+      if (targetIndex >= 0 && queue[targetIndex]) {
+        const vid = queue[targetIndex].videoId;
+        if (loadedVideoIdRef.current !== vid) {
+          playerRef.current.loadVideo(vid);
+          loadedVideoIdRef.current = vid;
+        }
       }
       playerRef.current.play();
       setIsPlaying(true);
@@ -81,6 +92,7 @@ const DjDeck = forwardRef<DjDeckHandle, DjDeckProps>(function DjDeck({
     loadAndPlay(videoId: string) {
       if (!playerRef.current) return;
       playerRef.current.loadVideo(videoId);
+      loadedVideoIdRef.current = videoId;
       playerRef.current.play();
       setIsPlaying(true);
     },
@@ -94,8 +106,18 @@ const DjDeck = forwardRef<DjDeckHandle, DjDeckProps>(function DjDeck({
         playerRef.current.pause();
         setIsPlaying(false);
       } else {
-        if (currentIndex >= 0 && queue[currentIndex]) {
-          playerRef.current.loadVideo(queue[currentIndex].videoId);
+        let targetIndex = currentIndex;
+        if (targetIndex === -1 && queue.length > 0) {
+          targetIndex = 0;
+          onCurrentIndexChange(0);
+        }
+
+        if (targetIndex >= 0 && queue[targetIndex]) {
+          const vid = queue[targetIndex].videoId;
+          if (loadedVideoIdRef.current !== vid) {
+            playerRef.current.loadVideo(vid);
+            loadedVideoIdRef.current = vid;
+          }
         }
         playerRef.current.play();
         setIsPlaying(true);
@@ -105,7 +127,9 @@ const DjDeck = forwardRef<DjDeckHandle, DjDeckProps>(function DjDeck({
       const nextIndex = currentIndex + 1;
       if (nextIndex < queue.length) {
         onCurrentIndexChange(nextIndex);
-        playerRef.current?.cueVideo(queue[nextIndex].videoId);
+        const vid = queue[nextIndex].videoId;
+        playerRef.current?.cueVideo(vid);
+        loadedVideoIdRef.current = vid;
         setIsPlaying(false);
       }
     },
@@ -163,10 +187,19 @@ const DjDeck = forwardRef<DjDeckHandle, DjDeckProps>(function DjDeck({
       setIsPlaying(false);
       if (isProjecting) sendProjection({ type: "pause" });
     } else {
-      if (currentIndex >= 0 && queue[currentIndex]) {
-        playerRef.current.loadVideo(queue[currentIndex].videoId);
-        if (isProjecting)
-          sendProjection({ type: "load", videoId: queue[currentIndex].videoId });
+      let targetIndex = currentIndex;
+      if (targetIndex === -1 && queue.length > 0) {
+        targetIndex = 0;
+        onCurrentIndexChange(0);
+      }
+
+      if (targetIndex >= 0 && queue[targetIndex]) {
+        const vid = queue[targetIndex].videoId;
+        if (loadedVideoIdRef.current !== vid) {
+          playerRef.current.loadVideo(vid);
+          loadedVideoIdRef.current = vid;
+          if (isProjecting) sendProjection({ type: "load", videoId: vid });
+        }
       }
       playerRef.current.play();
       setIsPlaying(true);
@@ -187,10 +220,12 @@ const DjDeck = forwardRef<DjDeckHandle, DjDeckProps>(function DjDeck({
     }
     if (nextIndex < queue.length) {
       onCurrentIndexChange(nextIndex);
-      playerRef.current?.loadVideo(queue[nextIndex].videoId);
+      const vid = queue[nextIndex].videoId;
+      playerRef.current?.loadVideo(vid);
+      loadedVideoIdRef.current = vid;
       setIsPlaying(true);
       if (isProjecting)
-        sendProjection({ type: "load", videoId: queue[nextIndex].videoId });
+        sendProjection({ type: "load", videoId: vid });
     } else {
       setIsPlaying(false);
       if (isProjecting) sendProjection({ type: "stop" });
