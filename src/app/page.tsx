@@ -178,6 +178,7 @@ export default function Home() {
         
         const fetchedA: Track[] = [];
         const fetchedB: Track[] = [];
+        const fetchedQ: Track[] = [];
 
         if (Array.isArray(data)) {
           for (const r of data) {
@@ -193,8 +194,20 @@ export default function Home() {
                 fetchedB.push({ videoId: parsed.videoId, title: r["B제목"] || "Video" });
               }
             }
+            if (r.Q) {
+              const parsed = parseYouTubeUrl(r.Q);
+              if (parsed.videoId) {
+                fetchedQ.push({ videoId: parsed.videoId, title: r["Q제목"] || "Video" });
+              }
+            }
           }
         }
+
+        // Q열 트랙을 A와 B에 번갈아가며 분배 (Smart Queue)
+        fetchedQ.forEach((track, i) => {
+          if (i % 2 === 0) fetchedA.push(track);
+          else fetchedB.push(track);
+        });
 
         // 기존 큐에서 메타데이터 복원 및 누락된 ID 수집
         const missingIds = new Set<string>();
